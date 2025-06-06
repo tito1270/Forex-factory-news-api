@@ -1,51 +1,77 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, Response
 import requests
 import xml.etree.ElementTree as ET
+from collections import defaultdict
 from datetime import datetime
 
 app = Flask(__name__)
 
-def fetch_forex_factory_news():
+def fetch_news():
     url = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml"
     response = requests.get(url)
-    news_data = []
-    
-    if response.status_code == 200:
-        root = ET.fromstring(response.content)
-        for event in root.findall("event"):
-            currency = event.get("currency")
-            impact = event.get("impact")
-            forecast = event.get("forecast", "")
-            previous = event.get("previous", "")
-            actual = event.get("actual", "")
-            date_str = event.get("date")
-            time_str = event.get("time")
-            timestamp = f"{date_str} {time_str}"
-            sentiment = analyze_sentiment(actual, forecast, previous)
-            news_data.append({
-                "currency": currency,
-                "time": timestamp,
-                "impact": impact,
-                "sentiment": sentiment
-            })
-    return news_data
+    if response.status_code != 200:
+        raise Exception("Failed to fetch Forex Factory news")
+    return response.content
 
-def analyze_sentiment(actual, forecast, previous):
-    try:
-        a, f, p = float(actual), float(forecast), float(previous)
-        if a > f and a > p:
-            return "Bullish"
-        elif a < f and a < p:
-            return "Bearish"
+def parse_and_analyze(xml_data):
+    root = ET.fromstring(xml_data)
+    currency_stats = defaultdict(list)
+
+    for item in root.findall("event"):
+        currency = item.find("currency").text
+        impact = item.find("impact").text
+        actual = item.find("actual").text
+        forecast = item.find("forecast").text
+
+        # Only analyze High and Medium impact events with numeric values
+        if impact in ("High", "Medium") and actual and forecast:
+            try:
+                actual_val = float(actual.replace("K", "000").replace("M", "000000").replace("%", ""))
+                forecast_val = float(forecast.replace("K", "000").replace("M", "000000").replace("%", ""))
+                if actual_val > forecast_val:
+                    currency_stats[currency].append("Bullish")
+                elif actual_val < forecast_val:
+                    currency_stats[currency].append("Bearish")
+                else:
+                    currency_stats[currency].append("Neutral")
+            except:
+                continue
+
+    final_result = {}
+    for currency, signals in currency_stats.items():
+        if not signals:
+            final_result[currency] = "Neutral"
+            continue
+        score = signals.count("Bullish") - signals.count("Bearish")
+        if score > 0:
+            final_result[currency] = "Bullish"
+        elif score < 0:
+            final_result[currency] = "Bearish"
         else:
-            return "Neutral"
-    except:
-        return "Neutral"
+            final_result[currency] = "Neutral"
 
-@app.route("/news")
-def news():
-    data = fetch_forex_factory_news()
-    return jsonify(data)
+    return final_result
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+@app.route('/news')
+def news_json():
+    xml_data = fetch_news()
+    result = parse_and_analyze(xml_data)
+    return jsonify(result)
+
+@app.route('/summary.txt')
+def news_summary_txt():
+    xml_data = fetch_news()
+    result = parse_and_analyze(xml_data)
+
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M GMT")
+    lines = [f"Date: {now}", ""]
+    currencies = ["USD", "EUR", "JPY", "GBP", "AUD", "NZD", "CHF", "CAD"]
+    for c in currencies:
+        sentiment = result.get(c, "Neutral")
+        lines.append(f"{c} - {sentiment}")
+
+    output = "\n".join(lines)
+    return Response(output, mimetype="text/plain")
+
+if __name__ == '__main__':
+    app.run()

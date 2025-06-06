@@ -4,6 +4,7 @@ import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime
 import os
+import traceback  # import para sa detailed error traceback
 
 app = Flask(__name__)
 
@@ -89,7 +90,8 @@ def news_summary_txt():
         return Response(output, mimetype="text/plain")
 
     except Exception as e:
-        print(f"Error in /summary.txt endpoint: {e}")
+        print("Error in /summary.txt endpoint:")
+        traceback.print_exc()  # dito lalabas ang full error stack trace sa terminal
         return Response("Internal Server Error", status=500)
 
 if __name__ == '__main__':

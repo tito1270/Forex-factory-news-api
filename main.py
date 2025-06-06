@@ -74,18 +74,23 @@ def news_json():
 
 @app.route('/summary.txt')
 def news_summary_txt():
-    xml_data = fetch_news()
-    result = parse_and_analyze(xml_data)
+    try:
+        xml_data = fetch_news()
+        result = parse_and_analyze(xml_data)
 
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M GMT")
-    lines = [f"Date: {now}", ""]
-    currencies = ["USD", "EUR", "JPY", "GBP", "AUD", "NZD", "CHF", "CAD"]
-    for c in currencies:
-        sentiment = result.get(c, "Neutral")
-        lines.append(f"{c} - {sentiment}")
+        now = datetime.utcnow().strftime("%Y-%m-%d %H:%M GMT")
+        lines = [f"Date: {now}", ""]
+        currencies = ["USD", "EUR", "JPY", "GBP", "AUD", "NZD", "CHF", "CAD"]
+        for c in currencies:
+            sentiment = result.get(c, "Neutral")
+            lines.append(f"{c} - {sentiment}")
 
-    output = "\n".join(lines)
-    return Response(output, mimetype="text/plain")
+        output = "\n".join(lines)
+        return Response(output, mimetype="text/plain")
+
+    except Exception as e:
+        print(f"Error in /summary.txt endpoint: {e}")
+        return Response("Internal Server Error", status=500)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

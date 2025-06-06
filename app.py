@@ -6,3 +6,6 @@ if __name__ == '__main__':
 @app.route('/')
 def home():
     return "Forex Factory News API is running!"
+@app.route('/')
+def home():
+    return "API is working!"

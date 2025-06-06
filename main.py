@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, Response
+from flask import Flask, jsonify, Response, request
 import requests
 import xml.etree.ElementTree as ET
 from collections import defaultdict
@@ -7,23 +7,26 @@ import os
 
 app = Flask(__name__)
 
+@app.before_request
+def before_request_logging():
+    print(f"Incoming request: {request.method} {request.path}")
+
 @app.route('/')
 def home():
     print("Home endpoint called")
-    return "API is working!"  # Para hindi mag-404 si Render health check
+    return "API is working!"  # para sa health check ng Render
 
 def fetch_news():
-    print("Fetching Forex Factory news...")
     url = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml"
+    print("Fetching news from:", url)
     response = requests.get(url)
     if response.status_code != 200:
-        print(f"Failed to fetch news, status code: {response.status_code}")
+        print("Failed to fetch Forex Factory news, status code:", response.status_code)
         raise Exception("Failed to fetch Forex Factory news")
-    print("News fetched successfully")
+    print("Fetched news successfully")
     return response.content
 
 def parse_and_analyze(xml_data):
-    print("Parsing and analyzing XML data")
     root = ET.fromstring(xml_data)
     currency_stats = defaultdict(list)
 
@@ -60,19 +63,17 @@ def parse_and_analyze(xml_data):
         else:
             final_result[currency] = "Neutral"
 
-    print(f"Final sentiment result: {final_result}")
+    print("Parsed result:", final_result)
     return final_result
 
 @app.route('/news')
 def news_json():
-    print("/news endpoint called")
     xml_data = fetch_news()
     result = parse_and_analyze(xml_data)
     return jsonify(result)
 
 @app.route('/summary.txt')
 def news_summary_txt():
-    print("/summary.txt endpoint called")
     xml_data = fetch_news()
     result = parse_and_analyze(xml_data)
 
@@ -84,7 +85,6 @@ def news_summary_txt():
         lines.append(f"{c} - {sentiment}")
 
     output = "\n".join(lines)
-    print(f"Generated summary:\n{output}")
     return Response(output, mimetype="text/plain")
 
 if __name__ == '__main__':

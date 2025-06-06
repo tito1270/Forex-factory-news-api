@@ -3,8 +3,13 @@ import requests
 import xml.etree.ElementTree as ET
 from collections import defaultdict
 from datetime import datetime
+import os
 
 app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "API is working!"  # <--- Para hindi na mag-404 si Render health check
 
 def fetch_news():
     url = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml"
@@ -23,7 +28,6 @@ def parse_and_analyze(xml_data):
         actual = item.find("actual").text
         forecast = item.find("forecast").text
 
-        # Only analyze High and Medium impact events with numeric values
         if impact in ("High", "Medium") and actual and forecast:
             try:
                 actual_val = float(actual.replace("K", "000").replace("M", "000000").replace("%", ""))
@@ -74,4 +78,6 @@ def news_summary_txt():
     return Response(output, mimetype="text/plain")
 
 if __name__ == '__main__':
-    app.run()
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
+

@@ -9,16 +9,21 @@ app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "API is working!"  # <--- Para hindi na mag-404 si Render health check
+    print("Home endpoint called")
+    return "API is working!"  # Para hindi mag-404 si Render health check
 
 def fetch_news():
+    print("Fetching Forex Factory news...")
     url = "https://cdn-nfs.faireconomy.media/ff_calendar_thisweek.xml"
     response = requests.get(url)
     if response.status_code != 200:
+        print(f"Failed to fetch news, status code: {response.status_code}")
         raise Exception("Failed to fetch Forex Factory news")
+    print("News fetched successfully")
     return response.content
 
 def parse_and_analyze(xml_data):
+    print("Parsing and analyzing XML data")
     root = ET.fromstring(xml_data)
     currency_stats = defaultdict(list)
 
@@ -38,7 +43,8 @@ def parse_and_analyze(xml_data):
                     currency_stats[currency].append("Bearish")
                 else:
                     currency_stats[currency].append("Neutral")
-            except:
+            except Exception as e:
+                print(f"Error parsing actual/forecast values: {e}")
                 continue
 
     final_result = {}
@@ -54,16 +60,19 @@ def parse_and_analyze(xml_data):
         else:
             final_result[currency] = "Neutral"
 
+    print(f"Final sentiment result: {final_result}")
     return final_result
 
 @app.route('/news')
 def news_json():
+    print("/news endpoint called")
     xml_data = fetch_news()
     result = parse_and_analyze(xml_data)
     return jsonify(result)
 
 @app.route('/summary.txt')
 def news_summary_txt():
+    print("/summary.txt endpoint called")
     xml_data = fetch_news()
     result = parse_and_analyze(xml_data)
 
@@ -75,9 +84,10 @@ def news_summary_txt():
         lines.append(f"{c} - {sentiment}")
 
     output = "\n".join(lines)
+    print(f"Generated summary:\n{output}")
     return Response(output, mimetype="text/plain")
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
+    print(f"Starting Flask app on port {port}...")
     app.run(host='0.0.0.0', port=port)
-
